@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>抓取规则灰度控制台</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <span class="dot" id="live-dot"></span>
+    <h1>抓取规则灰度控制台</h1>
+    <span class="sub" id="site-sub">本地可改版站点</span>
+  </div>
+  <div class="top-actions">
+    <a class="btn ghost" href="/practice-site" target="_blank" rel="noopener">打开资料站</a>
+    <button class="btn" id="btn-services">启动全部进程</button>
+    <button class="btn ghost" id="btn-tick">立即发布一轮</button>
+  </div>
+</header>
+
+<main>
+  <section class="strip" id="strip">
+    <div class="stat"><span class="label">原始页版本</span><span class="value" id="s-versions">–</span><span class="hint">去重后共享给两个解析进程</span></div>
+    <div class="stat"><span class="label">已发布</span><span class="value" id="s-published">–</span><span class="hint">入库端唯一写入</span></div>
+    <div class="stat"><span class="label">灰度暂扣</span><span class="value" id="s-held">–</span><span class="hint">未批准前不进入已发布库</span></div>
+    <div class="stat"><span class="label">待发布（已解析）</span><span class="value" id="s-ready">–</span><span class="hint" id="s-ready-hint"></span></div>
+    <div class="stat"><span class="label">当前规则</span><span class="value small" id="s-rule">–</span><span class="hint" id="s-epoch"></span></div>
+  </section>
+
+  <div class="grid two">
+    <section class="panel">
+      <div class="panel-head">
+        <h2>规则与版本边界</h2>
+        <span class="muted">抓取时绑定规则；发布授权可迁移</span>
+      </div>
+      <div class="table-wrap" id="epoch-table"></div>
+      <div class="legend">
+        <span><i class="chip baseline"></i>基线</span>
+        <span><i class="chip canary"></i>灰度</span>
+        <span><i class="chip promotion"></i>转正</span>
+        <span><i class="chip recovery"></i>回滚恢复</span>
+      </div>
+    </section>
+
+    <section class="panel" id="canary-panel">
+      <div class="panel-head">
+        <h2>灰度控制</h2>
+        <span class="muted">范围按页面身份稳定抽样</span>
+      </div>
+      <div id="canary-body"></div>
+    </section>
+  </div>
+
+  <section class="panel">
+    <div class="panel-head">
+      <h2>逐字段抽样对照</h2>
+      <div class="head-actions">
+        <label class="inline">样本
+          <select id="sample-select">
+            <option value="12">12 页</option>
+            <option value="24" selected>24 页</option>
+            <option value="60">60 页</option>
+          </select>
+        </label>
+        <button class="btn ghost" id="btn-refresh-report">重新抽样</button>
+      </div>
+    </div>
+    <div id="report-meta" class="report-meta"></div>
+    <div class="grid report-grid">
+      <div>
+        <h3>字段覆盖与一致率</h3>
+        <div class="table-wrap" id="field-table"></div>
+        <div id="row-issues"></div>
+      </div>
+      <div>
+        <h3>逐页差异</h3>
+        <div id="page-diff" class="page-diff"></div>
+      </div>
+    </div>
+  </section>
+
+  <div class="grid two">
+    <section class="panel">
+      <div class="panel-head"><h2>解析进程</h2><span class="muted">每个解析进程独立、可中断</span></div>
+      <div id="parsers"></div>
+      <div class="sim-row">
+        <button class="btn danger" id="btn-crash">模拟解析进程中断</button>
+        <button class="btn ghost" id="btn-recover">恢复中断的解析进程</button>
+      </div>
+      <p class="muted tip">中断后进度从已入库的解析结果重建：重启不会丢页，也不会重复发布。</p>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head"><h2>运行状态</h2><span class="muted" id="clock"></span></div>
+      <div id="processes"></div>
+      <div class="mini-grid">
+        <div><span class="muted">资料站版面</span><b id="site-variant">–</b></div>
+        <div><span class="muted">资料站版本号</span><b id="site-edition">–</b></div>
+        <div><span class="muted">商品页数</span><b id="site-items">–</b></div>
+        <div><span class="muted">抓取请求数</span><b id="site-requests">–</b></div>
+      </div>
+    </section>
+  </div>
+
+  <div class="grid two">
+    <section class="panel">
+      <div class="panel-head"><h2>进度检查点</h2><span class="muted">每次切换边界自动记录</span></div>
+      <div class="table-wrap" id="checkpoints"></div>
+    </section>
+    <section class="panel">
+      <div class="panel-head"><h2>事件流</h2><span class="muted">含发布闸门拒绝记录</span></div>
+      <div id="events" class="events"></div>
+    </section>
+  </div>
+
+  <section class="panel">
+    <div class="panel-head"><h2>演示工具</h2><span class="muted">修改资料站、制造新页面、跑不完整规则</span></div>
+    <div class="tools">
+      <div class="tool">
+        <h3>资料站基础操作</h3>
+        <div class="field-row"><label>版面</label>
+          <select id="tool-variant"><option>v1</option><option>v2</option><option>v3</option><option>v4</option></select>
+          <button class="btn" id="btn-set-variant">应用</button>
+        </div>
+        <div class="field-row"><label>新增系列</label>
+          <input id="tool-letter" placeholder="b" size="3">
+          <button class="btn" id="btn-add-series">新增 4 个商品页</button>
+        </div>
+        <div class="field-row"><label>改价</label>
+          <input id="tool-page" placeholder="a1" size="5">
+          <input id="tool-price" placeholder="399.00" size="7">
+          <button class="btn" id="btn-set-price">应用</button>
+        </div>
+      </div>
+      <div class="tool">
+        <h3>不完整候选规则</h3>
+        <p class="muted">parse-draft 会在列表页读错价格、丢弃描述的第二段。用它开灰度可以看到抽样对照拦截字段缺失/拆行。</p>
+        <button class="btn" id="btn-draft">装入并运行 parse-draft</button>
+        <button class="btn ghost" id="btn-canary-draft">用 parse-draft 开灰度</button>
+      </div>
+      <div class="tool">
+        <h3>模拟恢复</h3>
+        <p class="muted">在灰度中改站点并新增系列，再切回旧规则，检查已处理的新页面是否仍被发布。</p>
+        <button class="btn ghost" id="btn-seed">制造灰度期新页面 (v2 + 系列 b)</button>
+      </div>
+    </div>
+    <div id="tool-out" class="tool-out"></div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head"><h2>已发布入库</h2><span class="muted">每页只保留一版；版本键唯一</span></div>
+    <div class="table-wrap" id="inventory"></div>
+  </section>
+
+  <div id="toast" class="toast"></div>
+</main>
+<script src="/static/app.js"></script>
+</body>
+</html>
